@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>JSWords Example</title>
+	<style>
+html, body {
+	font-family: 'Arial';
+    font-size: 16px;
+	color: white;
+	background-color: rgb(32, 99, 201);
+	height: 100%;
+  	display: grid;
+}
+.select {
+    position: relative;
+    display: inline-block;
+    margin-bottom: 15px;
+    width: 100%;
+}    .select select {
+        font-family: 'Arial';
+        display: inline-block;
+        width: 100%;
+        cursor: pointer;
+        padding: 10px 15px;
+        outline: 0;
+        border: 0px solid #000000;
+        border-radius: 10px;
+        background: #ffffff;
+        color: #3d3d3d;
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+    }
+        .select select::-ms-expand {
+            display: none;
+        }
+        .select select:hover,
+        .select select:focus {
+            color: #000000;
+            background: #CCCCCC;
+        }
+        .select select:disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+.select_arrow {
+    position: absolute;
+    top: 12px;
+    right: 15px;
+    width: 0;
+    height: 0;
+    border: solid #7B7B7B;
+    border-width: 0 3px 3px 0;
+    display: inline-block;
+    padding: 3px;
+    transform: rotate(45deg);
+    -webkit-transform: rotate(45deg);
+}
+.select select:hover ~ .select_arrow,
+.select select:focus ~ .select_arrow {
+    border-top-color: #000000;
+}
+.select select:disabled ~ .select_arrow {
+    border-top-color: #CCCCCC;
+}
+.css-input {
+     padding: 5px;
+     font-size: 16px;
+     border-width: 1px;
+     border-color: #CCCCCC;
+     background-color: #FFFFFF;
+     color: #000000;
+     border-style: solid;
+     border-radius: 10px;
+     box-shadow: 0px 0px 5px rgba(66,66,66,.75);
+     text-shadow: undefined 0px 0px 5px px rgba(66,66,66,.75);
+}
+ .css-input:focus {
+     outline:none;
+}
+button {
+  font-family: arial;
+  color: #FFFFFF !important;
+  font-size: 1.2em;
+  box-shadow: 1px 1px 1px #BEE2F9;
+  padding: 10px 25px;
+  -moz-border-radius: 10px;
+  -webkit-border-radius: 10px;
+  border-radius: 10px;
+  border: 2px solid #3866A3;
+  cursor: pointer;
+  background: #4b4b4b;
+}
+button:hover {
+  background-color: #3c4f68 !important;
+  background: solid;
+}
+#toggle {
+	display: none;
+	visibility: hidden;
+}
+#settingsToggle {
+  display: block;
+  padding: 0.5em;
+  text-align: center;
+  border-bottom: 1px solid #CCC;
+  color: #FFF;
+}
+#settingsToggle .select_arrow {
+    border-color: #FFF;
+}
+#settingsToggle:hover {
+  color: #CCC;
+}
+#settingsToggle:hover .select_arrow {
+    border-color: #CCC;
+}
+#settings {
+  height: 0px;
+  overflow: hidden;
+  transition: height 0.5s;
+  color: #FFF;
+}
+#toggle:checked ~ #settings {
+  height: 150px;
+}
+    </style>
+    <script src="object_examples/english10k10.js"></script>
+    <script src="object_examples/fantasy10.js"></script>
+    <script src="object_examples/goethe10.js"></script>
+    <script src="object_examples/lotr10.js"></script>
+    <script src="object_examples/shakespeare10.js"></script>
+    <script src="object_examples/verne10.js"></script>
+    <script>
+ var JSONMinify = {
+	language: 'g',
+	levels: 'l',
+	probabilities: 'p',
+	next: 'n',
+	endProbability: 'e',
+	value: 'v',
+	char: 'c',
+	minify: function(key, value) {
+		if (value instanceof NormalizedTable || value.hasOwnProperty('char')) {
+			var result = {}
+			for (key in value)
+				result[JSONMinify[key]] = value[key]
+			return result
+		} else return value
+	}
+}
+
+var Language = {
+    default: 'enEN',
+    isValid: (char, language) => Language[language].includes(char),
+    createCharTrail: (text, language) => {
+    	var result = []
+		for (var char of text) {
+			result.push(Language[language].indexOf(char.toLowerCase()))
+		}
+		return result
+    },
+    enEN: 'abcdefghijklmnopqrstuvwqxyz',
+    enEN_dashed: 'abcdefghijklmnopqrstuvwqxyz-',
+    deDE: 'abcdefghijklmnopqrstuvwqxyzäöüß',
+    deDE_dashed: 'abcdefghijklmnopqrstuvwqxyzäöüß-',
+    frFR: "abcdefghijklmnopqrstuvwqyz'àéèìòùçâêîôûäëïüœ",
+    frFR_dashed: "abcdefghijklmnopqrstuvwqyz'àéèìòùçâêîôûäëïüœ-"
+}
+
+function NormalizedTable(language, levels) {
+	this.language = language
+	this.levels = levels
+	this.probabilities = []
+	this.endProbability = []
+	this.next = []
+}
+
+NormalizedTable.prototype.getChildByChar = function(char) {
+	for (var i in this.probabilities) 
+		if (this.probabilities[i].char === char) return this.next[i]
+	return null
+}
+
+NormalizedTable.prototype.getChildByCharTrail = function(charTrail) {
+	if (charTrail.length == 1) return this.getChildByChar(charTrail)
+	else {
+		var nextCharChild = this.getChildByChar(charTrail.charAt(0))
+		if (nextCharChild == null) return null
+		else return nextCharChild.getChildByCharTrail(charTrail.slice(1))
+	}
+}
+
+NormalizedTable.prototype.getCharFromProb = function(prob) {
+	var keys = this.probabilities.keys()
+	var currentKey = keys.next()
+	var i = currentKey.value
+	var total = this.probabilities[i].value
+	while (prob > total && !(currentKey = keys.next()).done) {
+		i = currentKey.value
+		total += this.probabilities[i].value
+	}
+	return this.probabilities[i].char
+}
+
+NormalizedTable.prototype.generateWord = function(options) {
+	var minLength = options.minLength
+	var maxLength = options.maxLength
+	var endFactor = NormalizedTable.weighedEndFactor(1)
+	if (options.endFactor != undefined) endFactor = options.endFactor
+	var levels = this.levels
+	if (options.levels != undefined) {
+		if (options.levels < this.levels) levels = options.levels
+	}
+	var endBacktrack = levels - 1
+	if (options.endBacktrack != undefined) {
+		if (options.endBacktrack > 0 && options.endBacktrack < this.levels - levels) endBacktrack += options.endBacktrack
+	}
+	if (options.endProbIndex != undefined) endBacktrack = options.endProbIndex
+
+    var rnd = Math.random()
+    var char = this.getCharFromProb(rnd)
+    var word = ""
+    var charTrail = ""
+    for (var i = 0; i < maxLength; i++) {
+        word += char
+        charTrail += char;
+        if (charTrail.length > levels) charTrail = charTrail.slice(1)
+    
+        rnd = Math.random()
+    	var tempProbTable = this.getChildByCharTrail(charTrail)
+    	while (tempProbTable == null || tempProbTable.probabilities.length == 0) {
+    		charTrail = charTrail.slice(1)
+    		tempProbTable = this.getChildByCharTrail(charTrail)
+    	}
+    	if (word.length >= minLength && endFactor(tempProbTable.endProbability[endBacktrack], rnd, word.length, minLength, maxLength)) break
+        char = tempProbTable.getCharFromProb(rnd)
+    }
+    return word.charAt(0).toUpperCase() + word.slice(1)
+}
+
+NormalizedTable.weighedEndFactor = function(weight) {
+	return function(prob, value, length, minLength, maxLength) {
+		return prob > 0 && value > (1 + Math.cos(Math.PI / (maxLength - minLength) * (length - minLength)))*weight
+	}
+}
+
+NormalizedTable.convertToNormalizedTable = function(object) {
+	var result = new NormalizedTable(object[JSONMinify.language], object[JSONMinify.levels])
+	result.probabilities = object[JSONMinify.probabilities]
+	result.endProbability = object[JSONMinify.endProbability]
+	for (var i in object[JSONMinify.next])
+		result.next[i] = NormalizedTable.convertToNormalizedTable(object[JSONMinify.next][i])
+	for (var prob of result.probabilities) {
+		prob.value = prob[JSONMinify.value]
+		prob.char = prob[JSONMinify.char]
+		delete prob[JSONMinify.value]
+		delete prob[JSONMinify.char]
+	}
+	return result
+}
+
+var lastLike = english10k10
+var currentNormTable = NormalizedTable.convertToNormalizedTable(lastLike)
+
+function generateFromSettings() {
+    var load = lastLike
+    switch(document.getElementById("like").options[document.getElementById("like").selectedIndex].value) {
+        case "english":
+            load = english10k10
+            break
+        case "lotr":
+            load = lotr10
+            break
+        case "shakespeare":
+            load = shakespeare10
+            break
+        case "goethe":
+            load = goethe10
+            break
+        case "verne":
+            load = verne10
+            break
+        case "goethe":
+            load = goethe10
+            break
+        case "fantasy":
+            load = fantasy10
+            break
+    }
+    if (lastLike != load) {
+        currentTable = NormalizedTable.convertToNormalizedTable(load)
+    }
+    var minLength = document.getElementById("minLength").value
+    var maxLength = document.getElementById("maxLength").value
+    var similarity = 10
+    switch (document.getElementById("similarity").value) {
+        case "veryLow":
+            similarity = 1
+            break
+        case "low":
+            similarity = 2
+            break
+        case "normal":
+            similarity = 3
+            break
+        case "high":
+            similarity = 5
+            break
+        case "veryHigh":
+            similarity = 7
+            break
+        case "extreme":
+            similarity = 10
+            break
+    }
+    word.value = currentNormTable.generateWord({minLength: minLength, maxLength: maxLength, levels: similarity, endFactor: NormalizedTable.weighedEndFactor(0.7)})
+
+}
+    </script>
+</head>
+<body>
+	<div style="margin: auto">
+		<div style="margin: 10px auto; width: 350px;">
+			<input id="word" readonly type="text" class="css-input" style="font-size: 2em; margin-bottom: 10px; width: 350px;" />
+		</div>
+		<div style="margin: 10px auto; width: 150px;">
+			<button style="width: 150px" onclick="generateFromSettings();">Generate!</button>
+		</div>
+        <input id="toggle" type="checkbox">
+        <label id="settingsToggle" for="toggle" style="margin: 0 auto; position: relative;">Settings<div class="select_arrow"></div></label>
+		<div id="settings" style="width: 245px; margin: 20px auto 0px auto">
+			<div>
+				Just like
+				<div class="select" style="width: 171px; margin-left: 10px">
+				    <select id="like">
+                        <option selected value="english">English</option>
+				        <option value="lotr">Lord of the Rings</option>
+				        <option value="shakespeare">Shakespeare</option>
+				        <option value="goethe">Goethe</option>
+				        <option value="verne">Jules Verne</option>
+				        <option value="fantasy">Every Fantasy Book</option>
+				    </select>
+				    <div class="select_arrow">
+				    </div>
+				</div>
+			</div>
+			<div>
+				<input id="minLength" type="number" class="css-input" style="width: 58px; margin: 0px 10px 0px 0px" value="3" />
+				to
+				<input id="maxLength" type="number" class="css-input" style="width: 58px; margin: 0px 10px" value="15" />
+				letters
+			</div>
+			<div style="padding-top: 16px;">
+				Similarity:
+				<div class="select" style="width: 170px;">
+			    <select id="similarity">
+			        <option value="veryLow">Very Low (Hhdgtrz!)</option>
+			        <option value="low">Low</option>
+			        <option selected value ="normal">Normal</option>
+			        <option value="high">High</option>
+			        <option value="veryHigh">Very High</option>
+			        <option value="extreme">Extreme</option>
+			    </select>
+			    <div class="select_arrow">
+			    </div>
+			</div>
+			</div>
+		</div>
+	</div>
+</body>
+</html>
