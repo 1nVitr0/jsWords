@@ -155,6 +155,7 @@ function NormalizedTable(language, levels) {
  * @param {String} char char to get child probability table of
  */
 NormalizedTable.prototype.getChildByChar = function(char) {
+	if (char == "") return this
 	for (var i in this.probabilities) 
 		if (this.probabilities[i].char === char) return this.next[i]
 	return null
@@ -164,7 +165,8 @@ NormalizedTable.prototype.getChildByChar = function(char) {
  * @param {string} charTrail char trail to get child probability table of
  */
 NormalizedTable.prototype.getChildByCharTrail = function(charTrail) {
-	if (charTrail.length == 1) return this.getChildByChar(charTrail)
+	if (charTrail.length < 1) return this
+	else if (charTrail.length == 1) return this.getChildByChar(charTrail)
 	else {
 		var nextCharChild = this.getChildByChar(charTrail.charAt(0))
 		if (nextCharChild == null) return null
